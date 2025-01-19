@@ -2,7 +2,7 @@
 <html>
 
 <body>
-    <canvas id="c" width="500" height="500" oncontextmenu="return true;" style="image-rendering: pixelated;"></canvas>
+    <canvas id="c" width="500" height="500" oncontextmenu="return false;" style="image-rendering: pixelated;"></canvas>
     <script>
         var canvas = document.getElementById('c'), w = canvas.width, h = canvas.height, max_iterations = 150, ctx = canvas.getContext('2d'), imageData = ctx.getImageData(0, 0, w, h), zoom = 1, XoffSet = -1, YoffSet = 0, gridSize = 4, startx = 0, starty = 0, genType = true, num = 6, currentPalette = 5, twofivefive = 255;
         var palettes = [
