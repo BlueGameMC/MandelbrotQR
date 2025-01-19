@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+    <canvas id="c" width="500" height="500" oncontextmenu="return true;" style="image-rendering: pixelated;"></canvas>
+    <script>
+        var canvas = document.getElementById('c'), w = canvas.width, h = canvas.height, max_iterations = 150, ctx = canvas.getContext('2d'), imageData = ctx.getImageData(0, 0, w, h), zoom = 1, XoffSet = -1, YoffSet = 0, gridSize = 4, startx = 0, starty = 0, genType = true, num = 6, currentPalette = 5, twofivefive = 255;
+        var palettes = [
+            [[0, 0, 0], [twofivefive, twofivefive, twofivefive]], // B/W
+            [[66, 30, 15], [25, 7, 26], [0, 7, 100], [twofivefive, twofivefive, twofivefive], [twofivefive, 201, 95], [106, 52, 3]], // Brown White Blue
+            [[0, 0, 128], [165, 205, twofivefive], [100, 149, 237], [176, 224, twofivefive], [0, 191, twofivefive]], // Light Blue Shades
+            [[twofivefive, 0, twofivefive], [0, twofivefive, twofivefive], [twofivefive, twofivefive, 0], [twofivefive, 165, 0], [twofivefive, 130, twofivefive], [twofivefive, 20, 147], [0, twofivefive, 127]], // iridescence
+            [[0, 0, 0], [twofivefive, 113, 38], [twofivefive, 195, 154], [twofivefive, twofivefive, 54], [63, 63, 116]] // Dark
+        ];
+        draw();
+        function draw() {
+            let screenArray = new Array(w);
+            for (let i = 0; i < w; i++) {
+                screenArray[i] = new Array(h);
+            }
+            for (let x = 0; x < w; x++) {
+                for (let y = 0; y < h; y++) {
+                    screenArray[x][y] = (x % gridSize == 0 || y % gridSize == 0) ? fractal(x, y) : -1;
+                }
+            }
+
+            gridSize = 32 * num;
+            for (let i = 0; i < 6; i++) {
+                for (let x = 0; x < w; x++) {
+                    for (let y = 0; y < h; y++) {
+                        if (x % gridSize == 0 && y % gridSize == 0 && x < w - gridSize) {
+                            let targetOutline = screenArray[x][y], gridEqual = true;
+                            for (let k = 0; k < gridSize; k++) {
+                                if (
+                                    screenArray[x][y + k] !== targetOutline ||
+                                    screenArray[x + gridSize][y + k] !== targetOutline ||
+                                    screenArray[x + k][y] !== targetOutline ||
+                                    screenArray[x + k][y + gridSize] !== targetOutline
+                                ) {
+                                    gridEqual = false;
+                                    break;
+                                }
+                            }
+                            if (gridEqual) {
+                                for (let k = 0; k < gridSize; k++) {
+                                    for (let j = 0; j < gridSize; j++) {
+                                        if (x + k < w && y + j < h) screenArray[x + k][y + j] = targetOutline;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                gridSize /= 2;
+            }
+
+            for (let x = 0; x < w; x++) {
+                for (let y = 0; y < h; y++) {
+                    let iterations = screenArray[x][y] == -1 ? fractal(x, y) : screenArray[x][y];
+                    let color = twofivefive - iterations * twofivefive / max_iterations;
+                    let [r, g, b] = hueRGB(color);
+                    setPixel(y, x, iterations == max_iterations ? 0 : r, iterations == max_iterations ? 0 : g, iterations == max_iterations ? 0 : b);
+                }
+            }
+
+
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function fractal(pixX, pixY) {
+            let x = (pixX / w) * 4 / zoom - 2 / zoom + XoffSet,
+                y = (pixY / h) * 4 / zoom - 2 / zoom + YoffSet,
+                a = genType ? 0 : startx,
+                b = genType ? 0 : starty,
+                iterations = 0;
+
+            while ((genType ? a * a + b * b : x * x + y * y) <= 4 && iterations < max_iterations) {
+                if (genType) [a, b] = [a * a - b * b + x, 2 * a * b + y];
+                else[x, y] = [x * x - y * y + a, 2 * x * y + b];
+                iterations++;
+            }
+
+            return iterations;
+        }
+
+
+        function setPixel(y, x, r, g, b) {
+            let i = (y * w + x) * 4;
+            imageData.data.set([r, g, b, twofivefive], i);
+        }
+
+        function mousePosition(e) {
+            let r = canvas.getBoundingClientRect();
+            return [
+                (e.clientX - r.left) / w * 4 / zoom - 2 / zoom + XoffSet,
+                (e.clientY - r.top) / h * 4 / zoom - 2 / zoom + YoffSet
+            ];
+        }
+        canvas.addEventListener('click', e => {
+            [XoffSet, YoffSet] = mousePosition(e);
+            zoom *= 1.7;
+            max_iterations += 50;
+            draw();
+        });
+        canvas.addEventListener('auxclick', e => {
+            if (e.button === 1) {
+                [startx, starty] = mousePosition(e);
+                genType = false;
+            } else {
+                [XoffSet, YoffSet] = mousePosition(e);
+                zoom /= 1.7;
+                max_iterations -= 50;
+            }
+            draw();
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.code === 'Space') {
+                startx = starty = 0;
+                genType = true;
+                draw();
+            }
+            if (e.code.startsWith('Digit')) {
+                num = parseInt(e.code[5]);
+                if (num > 0) {
+                    let result = num * 100;
+                    canvas.width = canvas.height = w = h = result;
+                    imageData = ctx.getImageData(0, 0, w, h);
+                    draw();
+                }
+            }
+        });
+
+        function hueRGB(h) {
+            if (currentPalette >= palettes.length)
+                return [1, 2, 3].map(i => Math.round(twofivefive * (Math.abs((h / 60 + i * 2) % 6 - 3) - 1)));
+
+            let palette = palettes[currentPalette],
+                index = h / twofivefive * (palette.length - 1),
+                [low, high] = [Math.floor(index), Math.ceil(index)],
+                ratio = index - low,
+                [r1, g1, b1] = palette[low],
+                [r2, g2, b2] = palette[high];
+
+            return [
+                r1 + ratio * (r2 - r1),
+                g1 + ratio * (g2 - g1),
+                b1 + ratio * (b2 - b1)
+            ];
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.code === 'KeyP') {
+                currentPalette = (currentPalette + 1) % (palettes.length + 1);
+                draw();
+            }
+        });
+
+    </script>
+</body>
+
+</html>
